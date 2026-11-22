@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en-GB"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2430">
+<title>The Believe Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#f4f1ea;--ink:#222;--card:#fff;--line:#ddd6c8;--accent:#e8590c;--nav:#1f2430}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1d22;--ink:#eee;--card:#2a2d35;--line:#40444e;--nav:#111}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px Inter,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;padding-top:env(safe-area-inset-top,0px)}
+nav{background:var(--nav);display:flex;gap:2px;overflow-x:auto;padding:6px;flex:none}
+nav button{background:none;border:0;color:#fff;opacity:.7;padding:8px 12px;font:600 12px Inter,sans-serif;letter-spacing:.05em;border-radius:8px;white-space:nowrap}
+nav button.on{opacity:1;background:#ffffff22}
+main{flex:1;position:relative;overflow:hidden}
+#board{position:absolute;inset:0;overflow:hidden;touch-action:none;background:#fbfbf8;background-image:radial-gradient(#0000001a 1px,transparent 1px);background-size:26px 26px;cursor:grab}
+#world{position:absolute;left:0;top:0;width:3000px;height:2000px;transform-origin:0 0}
+#sign{position:absolute;left:1100px;top:800px;width:800px;height:300px;background:#f6c723;border-radius:6px;transform:rotate(-1.5deg);box-shadow:0 10px 24px #0004,inset 0 0 40px #b8860b55;display:flex;flex-direction:column;align-items:center;justify-content:center;border:4px solid #d9a900;pointer-events:none}
+#sign b{font:700 170px/1 Caveat,cursive;color:#2a2a2a;letter-spacing:.04em}
+#sign small{font:700 34px Caveat,cursive;color:#2a2a2a;margin-top:-6px}
+.note{position:absolute;min-height:110px;padding:12px 12px 8px;font:500 22px/1.15 Caveat,cursive;color:#2a2a2a;box-shadow:2px 6px 10px #0003;cursor:move;user-select:none;display:flex;flex-direction:column}
+.note .t{flex:1;white-space:pre-wrap;word-break:break-word}
+.note .m{font:11px Inter,sans-serif;opacity:.7;margin-top:5px}
+.note .a{display:flex;gap:6px;margin-top:4px}
+.note .a button{background:#0000001a;border:0;border-radius:10px;padding:3px 8px;font:12px Inter,sans-serif}
+.rs{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 55%,#0004 55%)}
+.fab{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--accent);color:#fff;border:0;border-radius:999px;padding:14px 26px;font:700 16px Inter,sans-serif;box-shadow:0 6px 16px #0005;z-index:5;white-space:nowrap}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:5}
+.zoom button{width:38px;height:38px;border-radius:50%;border:0;background:var(--card);color:var(--ink);font-size:20px;box-shadow:0 2px 6px #0004}
+.page{position:absolute;inset:0;overflow:auto;padding:18px;max-width:760px;margin:auto}
+.page h2,.hand{font:700 38px Caveat,cursive;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0;display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.card small{opacity:.65;display:block;margin-top:4px}
+.row{display:flex;gap:8px;margin:10px 0}
+input,textarea,select{flex:1;font:16px Inter,sans-serif;padding:11px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-width:0;width:100%}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:11px 14px;font:600 14px Inter,sans-serif;white-space:nowrap}
+.btn.g{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.x{background:none;border:0;color:inherit;opacity:.5;font-size:18px}
+dialog{border:0;border-radius:6px;padding:16px;width:min(330px,92vw);box-shadow:0 12px 40px #0008}
+dialog::backdrop{background:#0007}
+dialog textarea{font:500 26px/1.15 Caveat,cursive;height:130px;background:transparent;border:0;resize:none;outline:0;color:#2a2a2a;padding:0}
+.sw{display:flex;gap:8px;margin:8px 0}.sw i{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer}.sw i.on{border-color:#222}
+.auth{max-width:380px;margin:auto;padding:30px 20px;text-align:center}
+.auth .big{font:700 80px/1 Caveat,cursive;color:#d9a900}
+.auth input{margin:6px 0}
+.err{color:#d33;font-size:13px;min-height:18px}
+@media print{nav,.fab,.zoom,.btn{display:none!important}body{overflow:visible}}
+</style></head>
+<body>
+<nav id="nav" hidden></nav>
+<main id="main"></main>
+<dialog id="dlg"><textarea id="dt"></textarea><div class="sw" id="sw"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn g" id="dc">Cancel</button><button class="btn" id="ds">Stick it up</button></div></dialog>
+<script>
+const SB=supabase.createClient("https://ijuorazfkbwgszeppsca.supabase.co","sb_publishable_iUdivOvhjxBteKw4nQ4UYA_K2eNtLl-");
+const COLS={yellow:"#fff176",blue:"#90caf9",pink:"#f48fb1",green:"#a5d6a7",orange:"#ffb74d"};
+const TABS=[["board","THE BOARD"],["values","TEAM VALUES"],["goals","SEASON GOALS"],["moments","MOMENTS"],["reflect","REFLECTION"],["history","HISTORY"],["team","TEAM"]];
+const KIND={values:"value",goals:"goal",moments:"moment",reflect:"reflection"};
+let S={uid:null,team:null,role:null,seasons:[],season:null,viewing:null,notes:[],rx:[],cm:[],items:[],members:[],names:{},invites:[]};
+let tab="board",view={x:0,y:0,k:.6},drag=null,color="yellow",editing=null,ch=null;
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nm=id=>S.names[id]||"Teammate",coach=()=>S.role==="coach",fmt=d=>new Date(d).toLocaleDateString("en-GB");
+const fail=r=>{if(r.error){alert(r.error.message);return true}};
+
+/* AUTH */
+function authScreen(mode="in",err=""){
+ $("#nav").hidden=true;
+ $("#main").innerHTML=`<div class="auth"><div class="big">BELIEVE</div><p>And… together we make it happen.</p>
+ ${mode==="up"?'<input id="an" placeholder="Your name (shown on your notes)">':""}
+ <input id="ae" type="email" placeholder="Email" autocomplete="email"><input id="ap" type="password" placeholder="Password (6+ characters)" autocomplete="${mode==="up"?"new":"current"}-password">
+ <div class="err">${esc(err)}</div><button class="btn" style="width:100%" id="ag">${mode==="up"?"Create account":"Sign in"}</button>
+ <p><a href="#" id="as">${mode==="up"?"I already have an account":"New here? Create an account"}</a></p>
+ ${new URLSearchParams(location.search).get("invite")?"<p><b>You've been invited to a team. Sign in or create an account to join.</b></p>":""}</div>`;
+ $("#as").onclick=e=>{e.preventDefault();authScreen(mode==="up"?"in":"up")};
+ $("#ag").onclick=async()=>{const e=$("#ae").value.trim(),p=$("#ap").value;
+  const r=mode==="up"?await SB.auth.signUp({email:e,password:p,options:{data:{display_name:($("#an").value||e.split("@")[0]).trim()}}}):await SB.auth.signInWithPassword({email:e,password:p});
+  if(r.error)return authScreen(mode,r.error.message);
+  if(mode==="up"&&!r.data.session)authScreen("in","Check your email to confirm your account, then sign in.")};
+}
+SB.auth.onAuthStateChange((ev,s)=>{if(ev==="SIGNED_OUT"){S.uid=null;authScreen()}else if(s&&s.user.id!==S.uid)setTimeout(()=>init(s.user.id),0)});
+SB.auth.getSession().then(({data})=>{if(!data.session)authScreen()});
+
+/* LOAD */
+async function init(uid){
+ S.uid=uid;$("#main").innerHTML='<div class="auth"><div class="big">BELIEVE</div><p>Loading…</p></div>';
+ const inv=new URLSearchParams(location.search).get("invite");
+ if(inv){const r=await SB.rpc("accept_invite",{invite_token:inv});if(r.error)alert(r.error.message);history.replaceState({},"",location.pathname)}
+ const m=await SB.from("team_members").select("team_id,role,teams(name)").eq("user_id",uid);
+ if(fail(m))return;
+ if(!m.data.length)return noTeam();
+ S.team={id:m.data[0].team_id,name:m.data[0].teams.name};S.role=m.data[0].role;
+ await loadSeasons();await Promise.all([loadNotes(),loadItems(),loadMembers()]);
+ $("#nav").hidden=false;$("#nav").innerHTML=TABS.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join("")+'<button data-t="out">SIGN OUT</button>';
+ $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t==="out")return SB.auth.signOut();if(t){tab=t;render()}};
+ if(ch)SB.removeChannel(ch);ch=SB.channel("t"+S.team.id);
+ const deb=(f)=>{let h;return()=>{clearTimeout(h);h=setTimeout(f,150)}};
+ const ln=deb(()=>{if(!drag)loadNotes()}),li=deb(loadItems);
+ ["notes","reactions","comments"].forEach(t=>ch.on("postgres_changes",{event:"*",schema:"public",table:t,filter:"team_id=eq."+S.team.id},ln));
+ ch.on("postgres_changes",{event:"*",schema:"public",table:"items",filter:"team_id=eq."+S.team.id},li).subscribe();
+ fit();render();
+}
+function noTeam(){
+ $("#nav").hidden=true;
+ $("#main").innerHTML=`<div class="auth"><div class="big">BELIEVE</div><p><b>Got an invite?</b> Open the invite link your coach sent you.</p><hr>
+ <p><b>Coaches: create your team</b></p><input id="tn" placeholder="Team name"><input id="sn" placeholder="Season, e.g. 2026/27">
+ <button class="btn" style="width:100%;margin-top:8px" id="tc">Create team</button><p><a href="#" id="so">Sign out</a></p></div>`;
+ $("#so").onclick=e=>{e.preventDefault();SB.auth.signOut()};
+ $("#tc").onclick=async()=>{const n=$("#tn").value.trim(),s=$("#sn").value.trim()||"2026/27";if(!n)return;
+  const r=await SB.rpc("create_team",{team_name:n,season_name:s});if(!fail(r))init(S.uid)};
+}
+async function loadSeasons(){const r=await SB.from("seasons").select("*").eq("team_id",S.team.id).order("created_at");S.seasons=r.data||[];S.season=S.seasons.find(s=>s.is_current)||S.seasons[S.seasons.length-1]}
+async function loadNotes(){
+ const [n,r,c]=await Promise.all([SB.from("notes").select("*").eq("team_id",S.team.id),SB.from("reactions").select("*").eq("team_id",S.team.id),SB.from("comments").select("*").eq("team_id",S.team.id).order("created_at")]);
+ S.notes=n.data||[];S.rx=r.data||[];S.cm=c.data||[];if(tab==="board")board()}
+async function loadItems(){const r=await SB.from("items").select("*").eq("team_id",S.team.id).order("created_at",{ascending:false});S.items=r.data||[];if(!["board","history","team"].includes(tab))render()}
+async function loadMembers(){
+ const r=await SB.from("team_members").select("user_id,role").eq("team_id",S.team.id);S.members=r.data||[];
+ const p=await SB.from("profiles").select("id,display_name").in("id",S.members.map(x=>x.user_id));(p.data||[]).forEach(x=>S.names[x.id]=x.display_name)}
+
+/* RENDER */
+function render(){
+ document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===tab));
+ if(tab==="board")return board();
+ const T={values:"Team Values",goals:"Season Goals",moments:"Moments",reflect:"Team Reflection",history:"Season History",team:"Team"}[tab];
+ $("#main").innerHTML=`<div class="page"><h2>${T}</h2>${tab==="history"?histHtml():tab==="team"?teamHtml():listHtml(tab)}</div>`;
+}
+function listHtml(t){
+ let h="";const kind=KIND[t];
+ if(t!=="values"||coach()){
+  const sel=t==="reflect"?'<select id="sub" style="flex:none;width:auto"><option value="did_well">What we did well</option><option value="learned">What we learned</option><option value="improve">What we need to improve</option></select>':"";
+  h+=`<div class="row">${sel}<input id="ni" placeholder="${{values:"Pin a team principle",goals:"Add a shared ambition",moments:"Record a moment or memory",reflect:"Add your reflection"}[t]}"><button class="btn" onclick="addItem('${t}')">Add</button></div>`}
+ const L=S.items.filter(i=>i.kind===kind&&i.season_id===S.season.id);
+ const lab={did_well:"What we did well",learned:"What we learned",improve:"What we need to improve"};
+ return h+(L.length?L.map(i=>`<div class="card"><div>${i.sub?`<b>${lab[i.sub]}</b><br>`:""}${esc(i.body)}<small>${esc(nm(i.author_id))} · ${fmt(i.created_at)}</small></div>${coach()||i.author_id===S.uid?`<button class="x" onclick="delItem('${i.id}')">✕</button>`:""}</div>`).join(""):'<p style="opacity:.6">Nothing here yet. Be the first.</p>');
+}
+async function addItem(t){const v=$("#ni").value.trim();if(!v)return;const s=$("#sub");
+ fail(await SB.from("items").insert({team_id:S.team.id,season_id:S.season.id,kind:KIND[t],sub:s?s.value:null,body:v,author_id:S.uid}));loadItems()}
+async function delItem(id){if(confirm("Remove this?")){await SB.from("items").delete().eq("id",id);loadItems()}}
+function histHtml(){
+ let h=`<div class="card"><div><b>Current: ${esc(S.season.name)}</b><small>${S.notes.filter(n=>n.season_id===S.season.id).length} thoughts on the board</small></div></div>`;
+ if(coach())h+='<div class="row"><input id="ns" placeholder="New season, e.g. 2027/28"><button class="btn" onclick="newSeason()">Archive &amp; start</button></div>';
+ h+=S.seasons.filter(s=>s.id!==S.season.id).reverse().map(s=>`<div class="card"><div><b>${esc(s.name)}</b><small>Started ${fmt(s.created_at)} · ${S.notes.filter(n=>n.season_id===s.id).length} thoughts</small></div><button class="btn g" onclick="S.viewing='${s.id}';tab='board';render()">Revisit</button></div>`).join("");
+ return h+'<p style="opacity:.6;font-size:13px">Archived boards stay saved. Open one, then use Print / PDF to save a copy.</p>';
+}
+async function newSeason(){const n=$("#ns").value.trim();if(!n||!confirm("Archive "+S.season.name+" and start "+n+"?"))return;
+ if(fail(await SB.rpc("start_new_season",{t:S.team.id,season_name:n})))return;await loadSeasons();S.viewing=null;render()}
+function teamHtml(){
+ let h=`<div class="card"><div><b>${esc(S.team.name)}</b><small>You are ${esc(nm(S.uid))} · ${coach()?"Coach / Admin":"Team member"}</small></div></div>`;
+ h+=S.members.map(m=>`<div class="card"><div>${esc(nm(m.user_id))}<small>${m.role==="coach"?"Coach":"Player"}</small></div>${coach()&&m.user_id!==S.uid?`<button class="x" onclick="rmMember('${m.user_id}')">✕</button>`:""}</div>`).join("");
+ if(coach())h+=`<h2 style="margin-top:24px">Invite someone</h2><div class="row"><select id="ir"><option value="member">Player</option><option value="coach">Coach</option></select><button class="btn" onclick="mkInvite()">Create invite link</button></div><div id="il"></div><p style="opacity:.6;font-size:13px">Each link works once and expires after 14 days.</p>`;
+ return h;
+}
+async function mkInvite(){const r=await SB.from("invites").insert({team_id:S.team.id,role:$("#ir").value,created_by:S.uid}).select().single();if(fail(r))return;
+ const url=location.origin+location.pathname+"?invite="+r.data.token;
+ $("#il").innerHTML=`<div class="card"><div style="word-break:break-all">${esc(url)}</div><button class="btn" id="cp">Share</button></div>`;
+ $("#cp").onclick=()=>navigator.share?navigator.share({title:"Join our Believe Board",url}).catch(()=>{}):navigator.clipboard.writeText(url).then(()=>alert("Link copied"))}
+async function rmMember(id){if(confirm("Remove "+nm(id)+" from the team?")){await SB.from("team_members").delete().eq("team_id",S.team.id).eq("user_id",id);loadMembers().then(render)}}
+
+/* BOARD */
+function board(){
+ const sid=S.viewing||S.season.id,ro=sid!==S.season.id,sName=(S.seasons.find(s=>s.id===sid)||{}).name;
+ $("#main").innerHTML=`<div id="board"><div id="world"><div id="sign"><b>BELIEVE</b><small>And… together we make it happen.</small></div></div></div>
+ <div class="zoom"><button onclick="zoom(1.25)">+</button><button onclick="zoom(.8)">−</button><button onclick="window.print()" style="font-size:11px">PDF</button></div>
+ ${ro?`<button class="fab" onclick="S.viewing=null;render()">${esc(sName)} (archived) · back to now</button>`:`<button class="fab" onclick="openEd()">ADD YOUR THOUGHT</button>`}`;
+ const w=$("#world");applyV();
+ S.notes.filter(n=>n.season_id===sid).forEach(n=>{
+  const d=document.createElement("div"),mine=n.author_id===S.uid||coach(),lk=S.rx.filter(r=>r.note_id===n.id),cs=S.cm.filter(c=>c.note_id===n.id);
+  d.className="note";d.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.w}px;min-height:${n.h}px;background:${COLS[n.color]};transform:rotate(${n.rotation}deg)`;
+  d.innerHTML=`<div class="t">${esc(n.body)}</div><div class="m">${esc(nm(n.author_id))} · ${fmt(n.created_at)}</div>${cs.map(c=>`<div class="m">↳ ${esc(c.body)} — ${esc(nm(c.author_id))}</div>`).join("")}
+  ${ro?"":`<div class="a"><button data-a="like">${lk.some(r=>r.user_id===S.uid)?"❤️":"🤍"} ${lk.length||""}</button><button data-a="reply">💬</button>${mine?'<button data-a="edit">✎</button><button data-a="del">🗑</button>':""}</div>`}${!ro&&mine?'<div class="rs"></div>':""}`;
+  d.onpointerdown=e=>noteDown(e,n,d,ro);w.appendChild(d)});
+ const b=$("#board");b.onpointerdown=panDown;b.onwheel=e=>{e.preventDefault();zoom(e.deltaY<0?1.1:.9,e.clientX,e.clientY)};
+}
+const applyV=()=>{const w=$("#world");if(w)w.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`};
+function fit(){const m=$("#main");view.k=Math.min(1,m.clientWidth/1400);view.x=m.clientWidth/2-1500*view.k;view.y=m.clientHeight/2-950*view.k}
+function zoom(f,cx,cy){const b=$("#board").getBoundingClientRect();cx=cx??b.left+b.width/2;cy=cy??b.top+b.height/2;const k=Math.min(2,Math.max(.25,view.k*f));
+ view.x=cx-b.left-(cx-b.left-view.x)*k/view.k;view.y=cy-b.top-(cy-b.top-view.y)*k/view.k;view.k=k;applyV()}
+const ptrs=new Map();let pan=null,pinch=0;
+const dist=()=>{const [a,b]=[...ptrs.values()];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1};
+const mid=()=>{const [a,b]=[...ptrs.values()];return[(a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2]};
+function panDown(e){if(e.target.closest(".note"))return;const b=$("#board");ptrs.set(e.pointerId,e);b.setPointerCapture(e.pointerId);
+ if(ptrs.size===1)pan={x:e.clientX-view.x,y:e.clientY-view.y};else{pan=null;pinch=dist()}
+ b.onpointermove=ev=>{if(!ptrs.has(ev.pointerId))return;ptrs.set(ev.pointerId,ev);
+  if(ptrs.size===2){const d=dist();zoom(d/pinch,...mid());pinch=d}else if(pan){view.x=ev.clientX-pan.x;view.y=ev.clientY-pan.y;applyV()}};
+ b.onpointerup=b.onpointercancel=ev=>{ptrs.delete(ev.pointerId);pan=null;pinch=0}}
+function noteDown(e,n,d,ro){
+ e.stopPropagation();const a=e.target.dataset.a;if(a)return act(a,n);
+ if(ro||!(n.author_id===S.uid||coach()))return;
+ const rs=e.target.classList.contains("rs");drag={sx:e.clientX,sy:e.clientY};d.setPointerCapture(e.pointerId);
+ d.onpointermove=ev=>{const dx=(ev.clientX-drag.sx)/view.k,dy=(ev.clientY-drag.sy)/view.k;
+  if(rs){d.style.width=Math.max(130,n.w+dx)+"px";d.style.minHeight=Math.max(110,n.h+dy)+"px"}else{d.style.left=n.x+dx+"px";d.style.top=n.y+dy+"px"}};
+ d.onpointerup=async ev=>{const dx=(ev.clientX-drag.sx)/view.k,dy=(ev.clientY-drag.sy)/view.k;d.onpointermove=d.onpointerup=null;
+  if(Math.abs(dx)+Math.abs(dy)>=2){const u=rs?{w:Math.max(130,n.w+dx),h:Math.max(110,n.h+dy)}:{x:n.x+dx,y:n.y+dy};Object.assign(n,u);await SB.from("notes").update(u).eq("id",n.id)}
+  drag=null}}
+async function act(a,n){
+ if(a==="like"){const mine=S.rx.find(r=>r.note_id===n.id&&r.user_id===S.uid);
+  if(mine){S.rx=S.rx.filter(r=>r!==mine);await SB.from("reactions").delete().eq("note_id",n.id).eq("user_id",S.uid)}
+  else{S.rx.push({note_id:n.id,user_id:S.uid});await SB.from("reactions").insert({note_id:n.id,user_id:S.uid,team_id:S.team.id})}board()}
+ if(a==="reply"){const t=prompt("Add a comment");if(t){await SB.from("comments").insert({note_id:n.id,team_id:S.team.id,author_id:S.uid,body:t.slice(0,300)});loadNotes()}}
+ if(a==="edit")openEd(n);
+ if(a==="del"&&confirm("Remove this note?")){await SB.from("notes").delete().eq("id",n.id);loadNotes()}}
+function openEd(n){editing=n||null;color=n?n.color:Object.keys(COLS)[Math.floor(Math.random()*5)];
+ $("#dt").value=n?n.body:"And... ";$("#sw").innerHTML=Object.keys(COLS).map(c=>`<i data-c="${c}" style="background:${COLS[c]}"></i>`).join("");paint();$("#dlg").showModal();$("#dt").focus()}
+function paint(){$("#dlg").style.background=COLS[color];$("#sw").querySelectorAll("i").forEach(i=>i.classList.toggle("on",i.dataset.c===color))}
+$("#sw").onclick=e=>{if(e.target.dataset.c){color=e.target.dataset.c;paint()}};
+$("#dc").onclick=()=>$("#dlg").close();
+$("#ds").onclick=async()=>{let t=$("#dt").value.trim();if(t.length<6)return;if(!/^and\.\.\./i.test(t))t="And... "+t;$("#dlg").close();
+ if(editing)await SB.from("notes").update({body:t,color}).eq("id",editing.id);
+ else{const b=$("#board").getBoundingClientRect(),cx=(b.width/2-view.x)/view.k,cy=(b.height/2-view.y)/view.k;
+  fail(await SB.from("notes").insert({team_id:S.team.id,season_id:S.season.id,author_id:S.uid,body:t,color,x:cx-95+(Math.random()-.5)*400,y:cy-75+(Math.random()-.5)*300,rotation:Math.round((Math.random()-.5)*8)}))}
+ loadNotes()};
+</script></body></html>
